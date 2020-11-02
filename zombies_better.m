@@ -6,15 +6,18 @@ Z_o = 1; %could be changed depending on assumptions about how the leak impacted 
 
 Vb  = 0; %birth rate, 
 Ksd = 0; % 
-Ksz = 6.88E+05; %
+Ksz = 6.88E+04; %
 Kdz = 0; %
-Kzr = 0.00008333333333; %
+%Kzr = 0.00008333333333;
+Kzr = 0.8333333333;
 
-tspan = 60*60; %minutes
+%tspan = 60*60; %minutes
+tspan1 = logspace(-20,2,5E1);
 
-options = odeset('AbsTol', 1e-14, 'RelTol', 5e-14);
 
-[t, p] = ode23s(@zombies, [0, tspan], [S_o, D_o, Z_o, R_o], options, [Vb, ...
+options = odeset('AbsTol', 1e-12, 'RelTol', 5e-12);
+
+[t, p] = ode23s(@zombies, tspan1, [S_o, D_o, Z_o, R_o], options, [Vb, ...
     Ksd, Ksz, Kdz, Kzr]);
 
 figure()
@@ -32,6 +35,39 @@ legend(["Zombies", "Removed"])
 
 % legend(["Susceptible", "Dead", "Zombies", "Removed"])
 
+%% Non quarantine changing rates
+S_o = 5.13E7; % 
+R_o = 0; % 
+D_o = 0; % 
+Z_o = 1; %could be changed depending on assumptions about how the leak impacted people  
+
+Vb  = 0; %birth rate, 
+Ksd = 0; % 
+Ksz = 6.88E+04; %
+Kdz = 0; %
+Kzr = 0.8333333333;
+Alpha = 0.01;%
+
+tspan = 60*60; %minutes
+
+options = odeset('AbsTol', 1e-6, 'RelTol', 5e-6);
+
+[t, p_dr] = ode23s(@zombies_changing_rates, [0, tspan], [S_o, D_o, Z_o, R_o, Ksz], options, [Vb, ...
+    Ksd, Kdz, Kzr, Alpha]);
+
+figure()
+loglog(t, p_dr(:,1), '--b','LineWidth', 3)
+hold on
+loglog(t, p_dr(:,2), 'o-c', 'LineWidth', 2)
+hold on
+legend(["Susceptible", "Dead"])
+hold off
+figure()
+loglog(t, p_dr(:,3), '--r', 'LineWidth', 3)
+hold on
+loglog(t, p_dr(:,4), 'o-k', 'LineWidth', 2)
+legend(["Zombies", "Removed"])
+
 
 %% Quarantine 
 
@@ -39,32 +75,37 @@ S_o = 3.429E6;
 R_o = 0;
 D_o = 0;
 Z_o = 1;
-Q_o = 1.00E7; 
+Q_o = 100; 
 
 Vb  = 0;
 Ksd = 0;
 Ksz = 1.91E2;
 Kdz = 0;
+%Kzr = 0.01;
 Kzr = 0.01;
-Kqs = 0;
+Kqs = 0.01;
 Ksq = 0.000046296296;
 
 options = odeset('AbsTol', 1e-14, 'RelTol', 1e-14);
 
-[t_q, p_q] = ode15s(@zombies_quarantine, [0 1000], [S_o, D_o, Z_o, R_o, Q_o], options, [Vb, ...
+[t_q, p_q] = ode15s(@zombies_quarantine, [0 2000], [S_o, D_o, Z_o, R_o, Q_o], options, [Vb, ...
     Ksd, Ksz, Kdz, Kzr, Kqs, Ksq]);
+figure()
+loglog(t_q, p_q(:,3), 'r', 'LineWidth', 2)
 
 figure()
-plot(t_q, p_q(:,1), 'b')
+loglog(t_q, p_q(:,1), 'b', 'LineWidth', 2)
 hold on
-plot(t_q, p_q(:,2), 'c')
+loglog(t_q, p_q(:,2), 'c', 'LineWidth', 2)
 hold on
-plot(t_q, p_q(:,3), 'r')
+loglog(t_q, p_q(:,3), 'r', 'LineWidth', 2)
 hold on
-plot(t_q, p_q(:,4), 'k')
+loglog(t_q, p_q(:,4), 'k', 'LineWidth', 2)
 hold on 
-plot (t_q, p_q(:,5))
+loglog(t_q, p_q(:,5), 'o-g', 'LineWidth', 2)
 legend(["Susceptible", "Dead","Zombies", "Removed", "Quarantined"])
+
+
 
 %% Functions
 % Non-Quarantine of Zombies
@@ -99,10 +140,11 @@ Kdz = k(4);
 Kzr = k(5);
 
 %assuming no birth rate
-dydt(1,:) = Vb - Ksd.*S - Ksz.*S.*Z;
+dydt(1,:) = Vb - Ksd.*S - Ksz.*S.*Z./(S+Z);
 dydt(2,:) = Ksd.*S - Kdz.*D;
-dydt(3,:) = Ksz.*S.*Z + Kdz.*D - Kzr.*S.*Z;
-dydt(4,:) = Kzr.*Z.*S;
+dydt(3,:) = Ksz.*S.*Z./(S+Z) + Kdz.*D - Kzr.*S.*Z./(S+Z);
+dydt(4,:) = Kzr.*Z.*S./(S+Z);
+
 
 end
 
@@ -142,10 +184,51 @@ Kqs = k(6);
 Ksq = k(7);
 
 %assuming no birth rate
-dydt(1,:) = Vb - Ksd.*S - Ksz.*S.*Z - Ksq.*S +Kqs.*Q;
+dydt(1,:) = Vb - Ksd.*S - Ksz.*S.*Z./(S+Z) - Ksq.*S +Kqs.*Q;
 dydt(2,:) = Ksd.*S - Kdz.*D;
-dydt(3,:) = Ksz.*S.*Z + Kdz.*D - Kzr.*S.*Z;
-dydt(4,:) = Kzr.*Z.*S;
+dydt(3,:) = Ksz.*S.*Z./(S+Z) + Kdz.*D - Kzr.*S.*Z./(S+Z);
+dydt(4,:) = Kzr.*Z.*S./(S+Z);
 dydt(5,:) = Ksq.*S - Kqs.*Q;
 
 end 
+
+function dydt = zombies_changing_rates(~,y,k)
+
+% 
+% System of ODEs describing a zombie outbreak
+%%S is susceptible population, Z is zombie population, R is removed population
+% Inputs:
+% y: a 1x4 [S, D, Z, R, Ksz]
+% k: a 1x4 [Vb, Ksd, Kdz, Kzr, Alpha] 
+%                            Vb  - Birth rate
+%                            Ksd - background death rate
+%                            Ksz - bite rate
+%                            Kdz - zombification rate
+%                            Kzr - "zombie destruction" rate
+%                            
+% Output (output is dydt):
+% A 1X4  [dS/dt, dD/dt, dZ/dt, dR/dt, dKsz/dt]
+ 
+
+dydt = zeros(5,1);
+S = y(1);
+D = y(2);
+Z = y(3);
+R = y(4);
+Ksz_mod = y(5);
+
+Vb = k(1);
+Ksd = k(2);
+Kdz = k(3);
+Kzr = k(4);
+Alpha = k(5);
+
+%assuming no birth rate
+dydt(1,:) = Vb - Ksd.*S - Ksz_mod.*S.*Z./(S+Z);
+dydt(2,:) = Ksd.*S - Kdz.*D;
+dydt(3,:) = Ksz_mod.*S.*Z./(S+Z) + Kdz.*D - Kzr.*S.*Z./(S+Z);
+dydt(4,:) = Kzr.*Z.*S./(S+Z);
+dydt(5,:) = -Alpha.*Ksz_mod;
+
+
+end
